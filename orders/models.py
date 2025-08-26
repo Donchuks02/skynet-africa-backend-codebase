@@ -25,7 +25,7 @@ class Order(models.Model):
         ("one_time", "One Time"),
     ]
 
-    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE, 
@@ -64,13 +64,16 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order {self.order_number} - {self.user.email}"
+    
 
+    # This method runs every time an order is saved.
+    # If the order is new and doesn't have a number yet, we create one.
     def save(self, *args, **kwargs):
-        # Auto-generate order number
         if not self.order_number:
             self.order_number = self.generate_order_number()
             
-        # Set timestamps based on status
+        # We automatically set the 'confirmed' or 'completed' timestamps
+        # when the status changes, so we don't have to do it manually.
         if self.status == 'confirmed' and not self.confirmed_at:
             self.confirmed_at = timezone.now()
         elif self.status == 'completed' and not self.completed_at:
@@ -79,7 +82,9 @@ class Order(models.Model):
         super().save(*args, **kwargs)
 
     def generate_order_number(self):
-        """Generate unique order number: SKY-2025-000001"""
+        """Generate unique order number: SKY-2025-000001
+        This checks the last order from the current year to figure out the next number
+        """
         year = timezone.now().year
         latest_order = Order.objects.filter(
             order_number__startswith=f'SKY-{year}-'

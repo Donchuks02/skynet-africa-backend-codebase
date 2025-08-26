@@ -1,8 +1,18 @@
+from django.db.models.signals import post_save, post_delete
+from .models import OrderItem
 import json
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from .models import Order
+from .models import Order, OrderItem
+
+
+
+# Update order subtotal when items change
+@receiver([post_save, post_delete], sender=OrderItem)
+def update_order_subtotal(sender, instance, **kwargs):
+    """Update order subtotal when items change"""
+    instance.order.update_subtotal()
 
 
 @receiver(pre_save, sender=Order)
@@ -19,13 +29,13 @@ def track_status_change(sender, instance, **kwargs):
         return
 
     if old_instance.status != instance.status:
-        history = instance.status_history or []
-        history.append({
-            "from": old_instance.status,
-            "to": instance.status,
-            "changed_at": timezone.now().isoformat(),
-        })
-        instance.status_history = history
+        from .models import OrderStatusHistory
+        OrderStatusHistory.objects.create(
+            order=instance,
+            previous_status=old_instance.status,
+            new_status=instance.status,
+            reason="Status changed by signal"
+        )
 
 
 @receiver(post_save, sender=Order)

@@ -13,7 +13,7 @@ from .permissions import IsOwnerOrAdmin
 
 class OrderViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing customer orders with proper business logic
+    ViewSet for managing customer orders with its business logic
     """
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdmin]
