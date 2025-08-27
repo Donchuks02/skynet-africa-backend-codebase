@@ -10,23 +10,30 @@ from orders.permissions import IsOwnerOrAdmin
 User = get_user_model()
 
 
+
+# ----------------------
+# Model Tests
+# ----------------------
+
 @pytest.mark.django_db
 class TestOrderModel:
+    # Test that subtotal is correctly updated when items are added to an order
     def test_subtotal_updates_on_item_save(self):
         user = User.objects.create_user(email="alice@example.com", password="pass")
         order = Order.objects.create(user=user)
 
-        item1 = OrderItem.objects.create(order=order, service_name="Book", quantity=2, unit_price=50)
-        item2 = OrderItem.objects.create(order=order, service_name="Pen", quantity=3, unit_price=10)
+        OrderItem.objects.create(order=order, service_name="Shared Hosting", quantity=2, unit_price=50)
+        OrderItem.objects.create(order=order, service_name="VPS", quantity=3, unit_price=10)
 
         order.refresh_from_db()
         assert float(order.subtotal) == 130.0
 
+    # Test that subtotal is updated when an item is deleted from an order
     def test_subtotal_updates_on_item_delete(self):
         user = User.objects.create_user(email="bob@example.com", password="pass")
         order = Order.objects.create(user=user)
 
-        item = OrderItem.objects.create(order=order, service_name="Book", quantity=2, unit_price=50)
+        item = OrderItem.objects.create(order=order, service_name="GPU VPS", quantity=2, unit_price=50)
         order.refresh_from_db()
         assert float(order.subtotal) == 100.0
 
@@ -34,6 +41,7 @@ class TestOrderModel:
         order.refresh_from_db()
         assert float(order.subtotal) == 0.0
 
+    # Test that status history is recorded when order status changes
     def test_status_history_signal(self):
         from orders.models import OrderStatusHistory
         user = User.objects.create_user(email="carol@example.com", password="pass")
@@ -52,18 +60,17 @@ class TestOrderModel:
 
 
 
-
-#  test serializers
-
-User = get_user_model()
-
+# ----------------------
+# Serializer Tests
+# ----------------------
 
 @pytest.mark.django_db
 class TestOrderSerializer:
+    # Test that order serialization returns correct data
     def test_order_serialization(self):
         user = User.objects.create_user(email="dave@example.com", password="pass")
         order = Order.objects.create(user=user, status="pending")
-        OrderItem.objects.create(order=order, service_name="Laptop", quantity=1, unit_price=1200)
+        OrderItem.objects.create(order=order, service_name="Dedicated Cloud", quantity=1, unit_price=1200)
 
         serializer = OrderSerializer(order)
         data = serializer.data
@@ -71,15 +78,16 @@ class TestOrderSerializer:
         assert data["status"] == "pending"
         assert data["subtotal"] == "1200.00"
         assert len(data["items"]) == 1
-        assert data["items"][0]["service_name"] == "Laptop"
+        assert data["items"][0]["service_name"] == "Dedicated Cloud"
 
+    # Test that deserialization creates order items and calculates subtotal
     def test_order_deserialization_creates_items(self):
         user = User.objects.create_user(email="eve@example.com", password="pass")
         payload = {
             "status": "pending",
             "items": [
-                {"service_name": "Chair", "quantity": 2, "unit_price": "150.00"},
-                {"service_name": "Desk", "quantity": 1, "unit_price": "300.00"},
+                {"service_name": "Domain Registration", "quantity": 2, "unit_price": "150.00"},
+                {"service_name": "Professional Email", "quantity": 1, "unit_price": "300.00"},
             ]
         }
         serializer = OrderSerializer(data=payload)
@@ -90,8 +98,9 @@ class TestOrderSerializer:
         assert float(order.subtotal) == 600.0
 
 
-
-# test view
+# ----------------------
+# API/View Tests
+# ----------------------
 
 @pytest.mark.django_db
 class TestOrderAPI:
@@ -109,17 +118,19 @@ class TestOrderAPI:
         admin_refresh = RefreshToken.for_user(self.admin)
         self.admin_access_token = str(admin_refresh.access_token)
 
+    # Test that a user can create an order with items
     def test_user_can_create_order_with_items(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.user_access_token)
         url = reverse("order-list")
         payload = {
             "status": "pending",
-            "items": [{"service_name": "Table", "quantity": 1, "unit_price": "200.00"}],
+            "items": [{"service_name": "VPS", "quantity": 1, "unit_price": "200.00"}],
         }
         response = self.client.post(url, payload, format="json")
         assert response.status_code == 201
         assert response.data["subtotal"] == "200.00"
 
+    # Test that a user cannot update another user's order
     def test_user_cannot_update_others_order(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.user_access_token)
         other = User.objects.create_user(email="other@example.com", password="pass")
@@ -129,6 +140,7 @@ class TestOrderAPI:
         response = self.client.patch(url, {"status": "confirmed"}, format="json")
         assert response.status_code == 404  # not found (DRF hides existence)
 
+    # Test that an admin can update any order
     def test_admin_can_update_any_order(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.admin_access_token)
         user_order = Order.objects.create(user=self.user, status="pending")
@@ -137,6 +149,7 @@ class TestOrderAPI:
         assert response.status_code == 200
         assert response.data["status"] == "confirmed"
 
+    # Test filtering orders by status
     def test_filtering_orders_by_status(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.user_access_token)
         Order.objects.create(user=self.user, status="pending")
@@ -147,13 +160,14 @@ class TestOrderAPI:
         assert response.status_code == 200
         assert all(o["status"] == "confirmed" for o in response.data)
 
+    # Test ordering of orders by subtotal in descending order
     def test_ordering_by_subtotal(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + self.user_access_token)
         o1 = Order.objects.create(user=self.user, status="pending")
-        OrderItem.objects.create(order=o1, service_name="A", quantity=1, unit_price=100)
+        OrderItem.objects.create(order=o1, service_name="Shared Hosting", quantity=1, unit_price=100)
 
         o2 = Order.objects.create(user=self.user, status="pending")
-        OrderItem.objects.create(order=o2, service_name="B", quantity=1, unit_price=300)
+        OrderItem.objects.create(order=o2, service_name="VPS", quantity=1, unit_price=300)
 
         url = reverse("order-list") + "?ordering=-subtotal"
         response = self.client.get(url)
@@ -162,10 +176,14 @@ class TestOrderAPI:
 
 
 
-#  test permission
+
+# ----------------------
+# Permission Tests
+# ----------------------
 
 @pytest.mark.django_db
 def test_only_owner_or_admin_can_edit():
+    """Test that only the order owner or an admin can edit an order"""
     factory = APIRequestFactory()
     owner = User.objects.create_user(email="owner@example.com", password="pass")
     other = User.objects.create_user(email="other@example.com", password="pass")
