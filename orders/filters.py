@@ -1,4 +1,3 @@
-# orders/filters.py
 import django_filters
 from .models import Order
 
