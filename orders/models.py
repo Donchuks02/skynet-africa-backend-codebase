@@ -6,7 +6,23 @@ from django.utils import timezone
 from decimal import Decimal
 
 # Create your models here.
+"""
+What This Code Will Let Users of the app (usually admins or customers) can:
 
+ Make and keep track of orders for different digital services, such as VPS, domains, email hosting, and more.
+
+ You can follow the progress of your order through several stages of its lifecycle: draft, pending, confirmed, completed, or cancelled.
+
+ Add more than one item to an order, each with its own price, configuration, and service metadata.
+
+ Create unique order numbers in the format SKY-YYYY-XXXXXX on their own.
+
+ Monitoring status changes with timestamps and reasons, as well as the name of the person who made the change.
+
+ Find and change subtotals based on the prices and quantities of the items.
+
+ Use custom manager methods like pending_orders() or active_orders() to filter and search orders.
+"""
 class Order(models.Model):
     
     STATUS_CHOICES = [
