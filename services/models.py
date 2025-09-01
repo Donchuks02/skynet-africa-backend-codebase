@@ -14,7 +14,7 @@ class ServiceInstance(models.Model):
     ]
 
     user =  models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="service_instances")
-    order_id = models.IntegerField()
+    order_id = models.UUIDField()
     service_type = models.CharField(max_length=50)
     instance_name = models.CharField(max_length=100, blank=True, null=True)
     configuration = models.JSONField(default=dict, blank=True)
