@@ -1,6 +1,3 @@
-from django.db.models.signals import post_save, post_delete
-from .models import OrderItem
-import json
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
